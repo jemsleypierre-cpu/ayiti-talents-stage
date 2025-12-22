@@ -1,0 +1,492 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
+All colors MUST be HSL.
+*/
+
+@layer base {
+/* THEME 1: ROUGE (RED) - Passionate & Bold */
+.theme-red {
+    /* Modern light background with clean feel */
+    --background: 0 0% 98%;
+    --foreground: 0 0% 10%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 10%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 10%;
+
+    /* Vibrant red primary with passion */
+    --primary: 0 85% 60%;
+    --primary-foreground: 0 0% 100%;
+    --primary-glow: 0 85% 70%;
+
+    /* Subtle gray secondary */
+    --secondary: 0 0% 95%;
+    --secondary-foreground: 0 0% 20%;
+
+    --muted: 0 0% 92%;
+    --muted-foreground: 0 0% 45%;
+
+    /* Red accent for highlights */
+    --accent: 0 85% 60%;
+    --accent-foreground: 0 0% 100%;
+
+    /* Warm orange highlight */
+    --highlight: 15 85% 65%;
+    --highlight-foreground: 0 0% 100%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 0 0% 85%;
+    --input: 0 0% 100%;
+    --ring: 0 85% 60%;
+
+    /* Custom gradients with red theme */
+    --gradient-primary: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary-glow)));
+    --gradient-sunset: linear-gradient(135deg, hsl(var(--highlight)), hsl(15 85% 55%));
+    --gradient-hero: linear-gradient(135deg, hsl(var(--primary)), hsl(350 85% 65%));
+    
+    /* Enhanced shadows for light theme */
+    --shadow-talent: 0 10px 30px -10px hsl(var(--primary) / 0.2);
+    --shadow-card: 0 8px 25px -8px hsl(0 0% 0% / 0.1);
+    --shadow-glow: 0 0 20px hsl(var(--primary) / 0.2);
+    
+    /* Animation */
+    --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* THEME 2: BLEU (BLUE) - Professional & Trustworthy */
+.theme-blue {
+    /* Clean white background */
+    --background: 0 0% 98%;
+    --foreground: 0 0% 10%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 10%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 10%;
+
+    /* Professional blue primary */
+    --primary: 220 85% 55%;
+    --primary-foreground: 0 0% 100%;
+    --primary-glow: 220 85% 65%;
+
+    /* Cool gray secondary */
+    --secondary: 220 15% 95%;
+    --secondary-foreground: 220 15% 20%;
+
+    --muted: 220 15% 92%;
+    --muted-foreground: 220 15% 45%;
+
+    /* Blue accent */
+    --accent: 220 85% 55%;
+    --accent-foreground: 0 0% 100%;
+
+    /* Cyan highlight */
+    --highlight: 195 85% 60%;
+    --highlight-foreground: 0 0% 100%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 220 15% 85%;
+    --input: 0 0% 100%;
+    --ring: 220 85% 55%;
+
+    /* Custom gradients with blue theme */
+    --gradient-primary: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary-glow)));
+    --gradient-sunset: linear-gradient(135deg, hsl(var(--highlight)), hsl(195 85% 50%));
+    --gradient-hero: linear-gradient(135deg, hsl(var(--primary)), hsl(240 85% 65%));
+    
+    /* Enhanced shadows */
+    --shadow-talent: 0 10px 30px -10px hsl(var(--primary) / 0.2);
+    --shadow-card: 0 8px 25px -8px hsl(0 0% 0% / 0.1);
+    --shadow-glow: 0 0 20px hsl(var(--primary) / 0.2);
+    
+    /* Animation */
+    --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* THEME 3: VERT (GREEN) - Natural & Fresh */
+.theme-green {
+    /* Fresh light background */
+    --background: 0 0% 98%;
+    --foreground: 0 0% 10%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 10%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 10%;
+
+    /* Vibrant green primary */
+    --primary: 145 85% 45%;
+    --primary-foreground: 0 0% 100%;
+    --primary-glow: 145 85% 55%;
+
+    /* Natural gray secondary */
+    --secondary: 145 15% 95%;
+    --secondary-foreground: 145 15% 20%;
+
+    --muted: 145 15% 92%;
+    --muted-foreground: 145 15% 45%;
+
+    /* Green accent */
+    --accent: 145 85% 45%;
+    --accent-foreground: 0 0% 100%;
+
+    /* Fresh mint highlight */
+    --highlight: 160 85% 55%;
+    --highlight-foreground: 0 0% 100%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 145 15% 85%;
+    --input: 0 0% 100%;
+    --ring: 145 85% 45%;
+
+    /* Custom gradients with green theme */
+    --gradient-primary: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary-glow)));
+    --gradient-sunset: linear-gradient(135deg, hsl(var(--highlight)), hsl(160 85% 45%));
+    --gradient-hero: linear-gradient(135deg, hsl(var(--primary)), hsl(120 85% 55%));
+    
+    /* Enhanced shadows */
+    --shadow-talent: 0 10px 30px -10px hsl(var(--primary) / 0.2);
+    --shadow-card: 0 8px 25px -8px hsl(0 0% 0% / 0.1);
+    --shadow-glow: 0 0 20px hsl(var(--primary) / 0.2);
+    
+    /* Animation */
+    --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* DEFAULT ROOT - PODCAST STYLE GREEN/TEAL THEME */
+:root {
+    /* Teal gradient background */
+    --background: 168 45% 35%;
+    --foreground: 0 0% 100%;
+
+    /* White cards for contrast */
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 10%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 10%;
+
+    /* Teal/Green primary */
+    --primary: 168 55% 40%;
+    --primary-foreground: 0 0% 100%;
+    --primary-glow: 168 55% 50%;
+
+    /* Darker teal secondary */
+    --secondary: 170 40% 25%;
+    --secondary-foreground: 0 0% 100%;
+
+    --muted: 168 20% 90%;
+    --muted-foreground: 168 20% 40%;
+
+    /* Vibrant Yellow accent (like the CTA button) */
+    --accent: 50 100% 50%;
+    --accent-foreground: 0 0% 10%;
+
+    /* Orange highlight */
+    --highlight: 35 100% 55%;
+    --highlight-foreground: 0 0% 10%;
+
+    --destructive: 0 85% 55%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 168 20% 80%;
+    --input: 0 0% 100%;
+    --ring: 168 55% 40%;
+
+    /* Modern gradients - Teal style */
+    --gradient-primary: linear-gradient(180deg, hsl(168 55% 45%), hsl(170 45% 30%));
+    --gradient-secondary: linear-gradient(180deg, hsl(170 45% 35%), hsl(175 40% 25%));
+    --gradient-dark: linear-gradient(180deg, hsl(168 45% 35%), hsl(170 40% 20%));
+    --gradient-hero: linear-gradient(180deg, hsl(168 55% 45%), hsl(170 45% 25%));
+    --gradient-sunset: linear-gradient(135deg, hsl(50 100% 50%), hsl(35 100% 55%));
+    --gradient-ocean: linear-gradient(180deg, hsl(168 55% 45%), hsl(175 40% 25%));
+    
+    /* Soft shadows */
+    --shadow-talent: 0 10px 40px -10px hsl(0 0% 0% / 0.2);
+    --shadow-card: 0 4px 20px -4px hsl(0 0% 0% / 0.15);
+    --shadow-glow: 0 0 30px hsl(168 55% 40% / 0.3);
+    --shadow-neon: 0 0 20px hsl(50 100% 50% / 0.3);
+    
+    /* Animation */
+    --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+
+    --radius: 1rem;
+
+    --sidebar-background: 170 40% 25%;
+    --sidebar-foreground: 0 0% 100%;
+    --sidebar-primary: 168 55% 40%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 50 100% 50%;
+    --sidebar-accent-foreground: 0 0% 10%;
+    --sidebar-border: 168 30% 35%;
+    --sidebar-ring: 168 55% 40%;
+  }
+
+  .dark {
+    /* Dark mode with teal accents */
+    --background: 220 15% 10%;
+    --foreground: 0 0% 98%;
+
+    --card: 220 15% 15%;
+    --card-foreground: 0 0% 98%;
+
+    --popover: 220 15% 18%;
+    --popover-foreground: 0 0% 98%;
+
+    --primary: 168 55% 45%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 170 40% 30%;
+    --secondary-foreground: 0 0% 100%;
+
+    --muted: 220 10% 20%;
+    --muted-foreground: 220 10% 60%;
+
+    --accent: 50 100% 50%;
+    --accent-foreground: 0 0% 10%;
+
+    --destructive: 0 85% 55%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 220 10% 25%;
+    --input: 220 15% 18%;
+    --ring: 168 55% 45%;
+    
+    --sidebar-background: 220 15% 10%;
+    --sidebar-foreground: 0 0% 98%;
+    --sidebar-primary: 168 55% 45%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 50 100% 50%;
+    --sidebar-accent-foreground: 0 0% 10%;
+    --sidebar-border: 220 10% 25%;
+    --sidebar-ring: 168 55% 45%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    background: hsl(var(--background));
+    min-height: 100vh;
+  }
+
+  /* Dark themed glassmorphic card effect */
+  .glass-card {
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+  }
+
+  /* Modern gradient text */
+  .gradient-text {
+    background: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary-glow)));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  /* Teal/Green gradient - Podcast style */
+  .gradient-green {
+    background: linear-gradient(135deg, hsl(50 100% 50%), hsl(45 100% 45%));
+  }
+
+  /* Yellow CTA button style */
+  .gradient-cta {
+    background: linear-gradient(135deg, hsl(50 100% 50%), hsl(45 100% 48%));
+    color: hsl(0 0% 10%);
+    font-weight: 600;
+  }
+
+  /* Teal gradient background */
+  .gradient-teal {
+    background: linear-gradient(180deg, hsl(168 55% 45%), hsl(170 45% 30%));
+  }
+
+  /* Modern gradient buttons */
+  .gradient-vibrant {
+    background: linear-gradient(135deg, hsl(168 55% 45%), hsl(175 40% 35%));
+  }
+
+  .gradient-fire {
+    background: linear-gradient(135deg, hsl(50 100% 50%), hsl(35 100% 55%));
+  }
+
+  .gradient-neon {
+    background: linear-gradient(135deg, hsl(168 55% 45%), hsl(50 100% 50%));
+  }
+
+  /* Subtle text shadow */
+  .neon-text {
+    text-shadow: 0 2px 10px hsl(0 0% 0% / 0.3);
+  }
+
+  /* Modern card hover - Podcast style */
+  .card-hover {
+    transition: all 0.3s ease;
+  }
+  .card-hover:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 15px 35px -10px hsl(0 0% 0% / 0.2);
+  }
+
+  /* White card style */
+  .white-card {
+    background: white;
+    color: hsl(0 0% 10%);
+    border-radius: 1.25rem;
+    box-shadow: 0 4px 20px -4px hsl(0 0% 0% / 0.1);
+  }
+
+  /* Pill/Badge style */
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.5rem 1rem;
+    border-radius: 9999px;
+    font-size: 0.875rem;
+    font-weight: 500;
+    transition: all 0.2s ease;
+  }
+  .pill-active {
+    background: white;
+    color: hsl(0 0% 10%);
+    box-shadow: 0 2px 10px hsl(0 0% 0% / 0.1);
+  }
+  .pill-inactive {
+    background: hsl(0 0% 100% / 0.2);
+    color: white;
+  }
+  .pill-inactive:hover {
+    background: hsl(0 0% 100% / 0.3);
+  }
+
+  /* Search bar style */
+  .search-bar {
+    background: hsl(0 0% 100% / 0.95);
+    border-radius: 9999px;
+    padding: 0.75rem 1.25rem;
+    box-shadow: 0 2px 15px hsl(0 0% 0% / 0.1);
+  }
+
+  /* Bottom nav dark */
+  .bottom-nav {
+    background: hsl(220 15% 12%);
+    border-top: 1px solid hsl(220 10% 20%);
+  }
+
+  /* Podcast card style */
+  .podcast-card {
+    background: hsl(220 15% 15%);
+    border-radius: 0.75rem;
+    overflow: hidden;
+  }
+
+  /* Animated gradient border */
+  .gradient-border {
+    position: relative;
+    background: hsl(var(--card));
+    border-radius: var(--radius);
+  }
+  .gradient-border::before {
+    content: '';
+    position: absolute;
+    inset: -2px;
+    background: linear-gradient(135deg, hsl(168 55% 45%), hsl(50 100% 50%));
+    border-radius: calc(var(--radius) + 2px);
+    z-index: -1;
+  }
+
+  /* Pulse animation - Teal */
+  .pulse-glow {
+    animation: pulse-glow 2s ease-in-out infinite;
+  }
+  @keyframes pulse-glow {
+    0%, 100% { box-shadow: 0 0 20px hsl(168 55% 45% / 0.3); }
+    50% { box-shadow: 0 0 35px hsl(168 55% 45% / 0.5); }
+  }
+
+  /* Yellow button pulse */
+  .pulse-yellow {
+    animation: pulse-yellow 2s ease-in-out infinite;
+  }
+  @keyframes pulse-yellow {
+    0%, 100% { box-shadow: 0 4px 20px hsl(50 100% 50% / 0.4); }
+    50% { box-shadow: 0 6px 30px hsl(50 100% 50% / 0.6); }
+  }
+
+  /* Floating animation */
+  .float {
+    animation: float 6s ease-in-out infinite;
+  }
+
+  @keyframes float {
+    0%, 100% { transform: translateY(0px); }
+    50% { transform: translateY(-10px); }
+  }
+
+  .animate-bounce-slow {
+    animation: bounce-slow 2s ease-in-out infinite;
+  }
+
+  @keyframes bounce-slow {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-5px); }
+  }
+
+  /* Modern button hover effects */
+  .modern-button {
+    position: relative;
+    overflow: hidden;
+    transition: all 0.3s ease;
+  }
+
+  .modern-button::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+    transition: left 0.5s;
+  }
+
+  .modern-button:hover::before {
+    left: 100%;
+  }
+
+  /* Dark theme specific styles */
+  .dark-card {
+    background: hsl(215 25% 16%);
+    border: 1px solid hsl(215 25% 25%);
+  }
+
+  /* Search bar dark theme */
+  .dark-search {
+    background: hsl(215 25% 18%);
+    border: 1px solid hsl(215 25% 25%);
+    color: hsl(0 0% 95%);
+  }
+
+  .dark-search::placeholder {
+    color: hsl(0 0% 65%);
+  }
+}
