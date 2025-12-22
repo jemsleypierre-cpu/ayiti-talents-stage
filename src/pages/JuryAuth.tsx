@@ -18,9 +18,9 @@ export const JuryAuth: React.FC = () => {
 
   // Membres du jury (authentification locale)
   const JURY_MEMBERS = [
-    { id: '1', name: 'Jean-Marc Désinor', email: 'jury1@ayititalents.com', password: 'jury123', specialty: 'Musique' },
-    { id: '2', name: 'Marie-Flore Saint-Jean', email: 'jury2@ayititalents.com', password: 'jury123', specialty: 'Danse' },
-    { id: '3', name: 'Patrick Sylvain', email: 'jury3@ayititalents.com', password: 'jury123', specialty: 'Chant' },
+    { id: '1', name: 'Jean-Marc Désinor', email: 'jury1@ayititalents.com', password: '@jury123', specialty: 'Musique' },
+    { id: '2', name: 'Marie-Flore Saint-Jean', email: 'jury2@ayititalents.com', password: '@jury123', specialty: 'Danse' },
+    { id: '3', name: 'Patrick Sylvain', email: 'jury3@ayititalents.com', password: '@jury123', specialty: 'Chant' },
   ];
 
   const handleLogin = async (e: React.FormEvent) => {
