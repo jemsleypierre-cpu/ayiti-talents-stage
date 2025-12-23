@@ -2,7 +2,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { HashRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { LanguageProvider } from "@/components/LanguageSwitcher";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { Header } from "@/components/Header";
@@ -41,7 +41,7 @@ const App = () => (
         <AuthProvider>
           <Toaster />
           <Sonner />
-          <HashRouter>
+          <BrowserRouter>
             <div className="min-h-screen bg-background flex flex-col">
               <Header />
               <main className="flex-1">
@@ -75,7 +75,7 @@ const App = () => (
               <BackToTop />
               <WhatsAppButton />
             </div>
-          </HashRouter>
+          </BrowserRouter>
         </AuthProvider>
       </LanguageProvider>
     </TooltipProvider>
