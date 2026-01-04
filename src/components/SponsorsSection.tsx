@@ -21,18 +21,9 @@ export const SponsorsSection: React.FC = () => {
 
   const loadSponsors = async () => {
     try {
-      const { data, error } = await supabase
-        .from('sponsors')
-        .select('*')
-        .eq('is_active', true)
-        .order('display_order', { ascending: true });
-
-      if (error) {
-        console.error('Error loading sponsors:', error);
-        return;
-      }
-
-      setSponsors((data || []) as Sponsor[]);
+      // Table sponsors n'existe pas encore - utiliser des données vides
+      // TODO: Créer la table sponsors dans la base de données
+      setSponsors([]);
     } catch (error) {
       console.error('Error loading sponsors:', error);
     } finally {

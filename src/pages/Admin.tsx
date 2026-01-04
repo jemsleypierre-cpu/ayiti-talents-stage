@@ -907,7 +907,7 @@ export const Admin: React.FC = () => {
           <h2 className="text-xl font-bold text-white">📊 Statistiques</h2>
           <div className="flex gap-2">
             <ExportButton tableName="candidate_applications" fileName="candidatures" />
-            <ExportButton tableName="contents" fileName="contenus" />
+            <ExportButton tableName="news" fileName="actualites" />
           </div>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
@@ -1699,12 +1699,7 @@ export const Admin: React.FC = () => {
               )}
             </div>
 
-            {/* Export sponsors */}
-            {sponsors.length > 0 && (
-              <div className="flex justify-end">
-                <ExportButton data={sponsors} filename="sponsors" />
-              </div>
-            )}
+            {/* Export sponsors - désactivé car table non disponible */}
           </TabsContent>
 
           {/* Tab Paramètres */}

@@ -16,13 +16,13 @@ import {
 interface Candidate {
   id: string;
   name: string;
-  age: number;
-  category: string;
-  location: string;
-  bio: string;
+  age: number | null;
+  category: string | null;
+  location: string | null;
+  bio: string | null;
   photo_url: string | null;
-  showcase_file_url: string | null;
-  total_votes: number;
+  showcase_file_url?: string | null;
+  total_votes: number | null;
 }
 
 export const Contestants: React.FC = () => {
@@ -73,7 +73,11 @@ export const Contestants: React.FC = () => {
 
         setCandidates(mappedCandidates);
       } else {
-        setCandidates(contestantsData);
+        // Map contestants data to include optional showcase_file_url
+        setCandidates(contestantsData.map(c => ({
+          ...c,
+          showcase_file_url: null // La table contestants n'a pas cette colonne
+        })));
       }
     } catch (error: any) {
       console.error('Erreur chargement candidats:', error);

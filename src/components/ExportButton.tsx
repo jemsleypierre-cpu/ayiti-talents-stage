@@ -5,7 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
 interface ExportButtonProps {
-  tableName: 'candidate_applications' | 'contestants' | 'contents';
+  tableName: 'candidate_applications' | 'contestants' | 'news' | 'organisateurs' | 'votes';
   fileName?: string;
   className?: string;
 }
