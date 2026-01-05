@@ -7,6 +7,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { useAdminAuth } from '@/hooks/useAdminAuth';
+import { useAuth } from '@/contexts/AuthContext';
+import { Link, useNavigate } from 'react-router-dom';
 import { 
   Users, 
   CheckCircle, 
@@ -32,20 +35,14 @@ import {
   Gavel,
   Key,
   Trophy,
-  TrendingUp
+  TrendingUp,
+  ArrowLeft,
+  Mail,
+  Lock,
+  Loader2
 } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import { ExportButton } from '@/components/ExportButton';
-
-// Liste des 3 administrateurs autorisés (emails)
-const ADMIN_EMAILS = [
-  'jemsleypierre@gmail.com',
-  'admin2@ayititalents.com', 
-  'admin3@ayititalents.com'
-];
-
-// Mot de passe admin simple (à changer en production)
-const ADMIN_PASSWORD = 'AyitiAdmin2024!';
 
 interface CandidateApplication {
   id: string;
@@ -99,9 +96,15 @@ interface JuryMember {
 
 export const Admin: React.FC = () => {
   const { toast } = useToast();
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [adminEmail, setAdminEmail] = useState('');
-  const [adminPassword, setAdminPassword] = useState('');
+  const navigate = useNavigate();
+  const { isAdmin, loading: adminLoading, user } = useAdminAuth();
+  const { signOut } = useAuth();
+  
+  // Login form state
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+  const [loginLoading, setLoginLoading] = useState(false);
+  
   const [applications, setApplications] = useState<CandidateApplication[]>([]);
   const [loading, setLoading] = useState(false);
   const [stats, setStats] = useState({
@@ -154,36 +157,46 @@ export const Admin: React.FC = () => {
   const [editingJury, setEditingJury] = useState<string | null>(null);
   const [savingJury, setSavingJury] = useState(false);
 
-  // Vérifier l'authentification admin
-  const handleAdminLogin = () => {
-    if (ADMIN_EMAILS.includes(adminEmail.toLowerCase()) && adminPassword === ADMIN_PASSWORD) {
-      setIsAuthenticated(true);
-      localStorage.setItem('adminAuth', 'true');
-      localStorage.setItem('adminEmail', adminEmail);
+  // Login with Supabase Auth
+  const handleAdminLogin = async () => {
+    if (!loginEmail || !loginPassword) {
       toast({
-        title: "Connexion réussie",
-        description: `Bienvenue, ${adminEmail}!`,
-      });
-      loadApplications();
-      loadContents();
-      loadSponsors();
-      loadSettings();
-      loadJuryMembers();
-    } else {
-      toast({
-        title: "Accès refusé",
-        description: "Email ou mot de passe incorrect.",
+        title: "Erreur",
+        description: "Veuillez entrer votre email et mot de passe.",
         variant: "destructive"
       });
+      return;
+    }
+
+    setLoginLoading(true);
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email: loginEmail,
+        password: loginPassword,
+      });
+
+      if (error) {
+        toast({
+          title: "Erreur de connexion",
+          description: error.message,
+          variant: "destructive"
+        });
+      }
+      // Auth state change will trigger the useAdminAuth hook to recheck admin status
+    } catch (error) {
+      toast({
+        title: "Erreur",
+        description: "Une erreur inattendue s'est produite.",
+        variant: "destructive"
+      });
+    } finally {
+      setLoginLoading(false);
     }
   };
 
-  const handleLogout = () => {
-    setIsAuthenticated(false);
-    localStorage.removeItem('adminAuth');
-    localStorage.removeItem('adminEmail');
-    setAdminEmail('');
-    setAdminPassword('');
+  const handleLogout = async () => {
+    await signOut();
+    navigate('/');
   };
 
   // Charger les candidatures
@@ -785,20 +798,16 @@ export const Admin: React.FC = () => {
     }
   };
 
-  // Vérifier auth au chargement
+  // Charger les données quand l'admin est authentifié
   useEffect(() => {
-    const auth = localStorage.getItem('adminAuth');
-    const email = localStorage.getItem('adminEmail');
-    if (auth === 'true' && email && ADMIN_EMAILS.includes(email.toLowerCase())) {
-      setIsAuthenticated(true);
-      setAdminEmail(email);
+    if (isAdmin && user) {
       loadApplications();
       loadContents();
       loadSponsors();
       loadSettings();
       loadJuryMembers();
     }
-  }, []);
+  }, [isAdmin, user]);
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -821,58 +830,119 @@ export const Admin: React.FC = () => {
     return labels[category] || category;
   };
 
-  // Page de connexion admin
-  if (!isAuthenticated) {
+  // Loading state
+  if (adminLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-background via-card/50 to-background flex items-center justify-center p-4">
+        <div className="text-center">
+          <Loader2 className="h-12 w-12 animate-spin text-primary mx-auto mb-4" />
+          <p className="text-muted-foreground">Vérification des permissions...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Page de connexion admin - si pas connecté ou pas admin
+  if (!user || !isAdmin) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-background via-card/50 to-background flex items-center justify-center p-4">
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/20 via-transparent to-transparent"></div>
-        <Card className="w-full max-w-md relative border-primary/20 bg-card/80 backdrop-blur-xl shadow-2xl shadow-primary/10">
-          <CardHeader className="text-center">
-            <div className="mx-auto bg-gradient-to-br from-primary to-accent rounded-2xl p-4 w-20 h-20 flex items-center justify-center mb-4 shadow-lg shadow-primary/30">
-              <Shield className="h-10 w-10 text-primary-foreground" />
-            </div>
-            <CardTitle className="text-3xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-              Administration
-            </CardTitle>
-            <p className="text-muted-foreground">Connectez-vous pour accéder au panneau admin</p>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="email">Email Admin</Label>
-              <Input
-                id="email"
-                type="email"
-                value={adminEmail}
-                onChange={(e) => setAdminEmail(e.target.value)}
-                placeholder="admin@ayititalents.com"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="password">Mot de passe</Label>
-              <Input
-                id="password"
-                type="password"
-                value={adminPassword}
-                onChange={(e) => setAdminPassword(e.target.value)}
-                placeholder="••••••••"
-                onKeyPress={(e) => e.key === 'Enter' && handleAdminLogin()}
-              />
-            </div>
-            <Button onClick={handleAdminLogin} className="w-full">
-              Se connecter
+        
+        <div className="w-full max-w-md relative">
+          <div className="mb-6">
+            <Button variant="ghost" asChild className="gap-2 text-muted-foreground hover:text-foreground">
+              <Link to="/">
+                <ArrowLeft className="h-4 w-4" />
+                Retour à l'accueil
+              </Link>
             </Button>
-            
-            <div className="mt-4 p-4 bg-muted rounded-lg">
-              <p className="text-sm text-muted-foreground text-center">
-                <strong>Comptes Admin:</strong><br/>
-                jemsleypierre@gmail.com<br/>
-                admin2@ayititalents.com<br/>
-                admin3@ayititalents.com<br/>
-                <strong>Mot de passe:</strong> AyitiAdmin2024!
+          </div>
+
+          <Card className="border-primary/20 bg-card/80 backdrop-blur-xl shadow-2xl shadow-primary/10">
+            <CardHeader className="text-center">
+              <div className="mx-auto bg-gradient-to-br from-primary to-accent rounded-2xl p-4 w-20 h-20 flex items-center justify-center mb-4 shadow-lg shadow-primary/30">
+                <Shield className="h-10 w-10 text-primary-foreground" />
+              </div>
+              <CardTitle className="text-3xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+                Administration
+              </CardTitle>
+              <p className="text-muted-foreground">
+                {user && !isAdmin 
+                  ? "Vous n'avez pas les permissions d'administrateur." 
+                  : "Connectez-vous pour accéder au panneau admin"
+                }
               </p>
-            </div>
-          </CardContent>
-        </Card>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {user && !isAdmin ? (
+                // User is logged in but not admin
+                <div className="text-center space-y-4">
+                  <p className="text-sm text-muted-foreground">
+                    Connecté en tant que: <strong>{user.email}</strong>
+                  </p>
+                  <Button variant="outline" onClick={handleLogout} className="w-full">
+                    <LogOut className="h-4 w-4 mr-2" />
+                    Se déconnecter
+                  </Button>
+                </div>
+              ) : (
+                // Not logged in - show login form
+                <>
+                  <div className="space-y-2">
+                    <Label htmlFor="email">Email Admin</Label>
+                    <div className="relative">
+                      <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        id="email"
+                        type="email"
+                        value={loginEmail}
+                        onChange={(e) => setLoginEmail(e.target.value)}
+                        placeholder="zoe1@ayititalents.com"
+                        className="pl-10"
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="password">Mot de passe</Label>
+                    <div className="relative">
+                      <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        id="password"
+                        type="password"
+                        value={loginPassword}
+                        onChange={(e) => setLoginPassword(e.target.value)}
+                        placeholder="••••••••"
+                        className="pl-10"
+                        onKeyPress={(e) => e.key === 'Enter' && handleAdminLogin()}
+                      />
+                    </div>
+                  </div>
+                  <Button 
+                    onClick={handleAdminLogin} 
+                    className="w-full"
+                    disabled={loginLoading}
+                  >
+                    {loginLoading ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Connexion...
+                      </>
+                    ) : (
+                      'Se connecter'
+                    )}
+                  </Button>
+                  
+                  <div className="mt-4 p-4 bg-muted/50 rounded-lg border border-border">
+                    <p className="text-sm text-muted-foreground text-center">
+                      <strong>🔐 Accès réservé aux administrateurs</strong><br/>
+                      <span className="text-xs">Contactez un admin si vous avez besoin d'accès.</span>
+                    </p>
+                  </div>
+                </>
+              )}
+            </CardContent>
+          </Card>
+        </div>
       </div>
     );
   }
@@ -892,7 +962,7 @@ export const Admin: React.FC = () => {
             </h1>
           </div>
           <div className="flex items-center gap-4">
-            <span className="text-sm text-muted-foreground">{adminEmail}</span>
+            <span className="text-sm text-muted-foreground">{user.email}</span>
             <Button variant="outline" size="sm" onClick={handleLogout}>
               <LogOut className="h-4 w-4 mr-2" />
               Déconnexion
