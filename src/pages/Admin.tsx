@@ -7,8 +7,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { useAdminAuth } from '@/hooks/useAdminAuth';
-import { useAuth } from '@/contexts/AuthContext';
 import { Link, useNavigate } from 'react-router-dom';
 import { 
   Users, 
@@ -37,12 +35,15 @@ import {
   Trophy,
   TrendingUp,
   ArrowLeft,
-  Mail,
   Lock,
   Loader2
 } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import { ExportButton } from '@/components/ExportButton';
+
+// Liste des administrateurs autorisés (usernames simples)
+const ADMIN_USERS = ['zoe1', 'zoe2', 'zoe3'];
+const ADMIN_PASSWORD = 'Zoe2106';
 
 interface CandidateApplication {
   id: string;
@@ -97,11 +98,10 @@ interface JuryMember {
 export const Admin: React.FC = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
-  const { isAdmin, loading: adminLoading, user } = useAdminAuth();
-  const { signOut } = useAuth();
   
-  // Login form state
-  const [loginEmail, setLoginEmail] = useState('');
+  // Simple auth state
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [loginUsername, setLoginUsername] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
   const [loginLoading, setLoginLoading] = useState(false);
   
@@ -157,45 +157,45 @@ export const Admin: React.FC = () => {
   const [editingJury, setEditingJury] = useState<string | null>(null);
   const [savingJury, setSavingJury] = useState(false);
 
-  // Login with Supabase Auth
-  const handleAdminLogin = async () => {
-    if (!loginEmail || !loginPassword) {
+  // Simple username/password login
+  const handleAdminLogin = () => {
+    if (!loginUsername || !loginPassword) {
       toast({
         title: "Erreur",
-        description: "Veuillez entrer votre email et mot de passe.",
+        description: "Veuillez entrer votre nom d'utilisateur et mot de passe.",
         variant: "destructive"
       });
       return;
     }
 
     setLoginLoading(true);
-    try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email: loginEmail,
-        password: loginPassword,
-      });
+    
+    // Check credentials
+    const isValidUser = ADMIN_USERS.includes(loginUsername.toLowerCase());
+    const isValidPassword = loginPassword === ADMIN_PASSWORD;
 
-      if (error) {
+    setTimeout(() => {
+      if (isValidUser && isValidPassword) {
+        setIsAuthenticated(true);
+        toast({
+          title: "Connexion réussie",
+          description: `Bienvenue ${loginUsername}!`,
+        });
+      } else {
         toast({
           title: "Erreur de connexion",
-          description: error.message,
+          description: "Nom d'utilisateur ou mot de passe incorrect.",
           variant: "destructive"
         });
       }
-      // Auth state change will trigger the useAdminAuth hook to recheck admin status
-    } catch (error) {
-      toast({
-        title: "Erreur",
-        description: "Une erreur inattendue s'est produite.",
-        variant: "destructive"
-      });
-    } finally {
       setLoginLoading(false);
-    }
+    }, 500);
   };
 
-  const handleLogout = async () => {
-    await signOut();
+  const handleLogout = () => {
+    setIsAuthenticated(false);
+    setLoginUsername('');
+    setLoginPassword('');
     navigate('/');
   };
 
@@ -800,14 +800,14 @@ export const Admin: React.FC = () => {
 
   // Charger les données quand l'admin est authentifié
   useEffect(() => {
-    if (isAdmin && user) {
+    if (isAuthenticated) {
       loadApplications();
       loadContents();
       loadSponsors();
       loadSettings();
       loadJuryMembers();
     }
-  }, [isAdmin, user]);
+  }, [isAuthenticated]);
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -830,20 +830,8 @@ export const Admin: React.FC = () => {
     return labels[category] || category;
   };
 
-  // Loading state
-  if (adminLoading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-background via-card/50 to-background flex items-center justify-center p-4">
-        <div className="text-center">
-          <Loader2 className="h-12 w-12 animate-spin text-primary mx-auto mb-4" />
-          <p className="text-muted-foreground">Vérification des permissions...</p>
-        </div>
-      </div>
-    );
-  }
-
-  // Page de connexion admin - si pas connecté ou pas admin
-  if (!user || !isAdmin) {
+  // Page de connexion admin - si pas connecté
+  if (!isAuthenticated) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-background via-card/50 to-background flex items-center justify-center p-4">
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/20 via-transparent to-transparent"></div>
@@ -867,79 +855,60 @@ export const Admin: React.FC = () => {
                 Administration
               </CardTitle>
               <p className="text-muted-foreground">
-                {user && !isAdmin 
-                  ? "Vous n'avez pas les permissions d'administrateur." 
-                  : "Connectez-vous pour accéder au panneau admin"
-                }
+                Connectez-vous pour accéder au panneau admin
               </p>
             </CardHeader>
             <CardContent className="space-y-4">
-              {user && !isAdmin ? (
-                // User is logged in but not admin
-                <div className="text-center space-y-4">
-                  <p className="text-sm text-muted-foreground">
-                    Connecté en tant que: <strong>{user.email}</strong>
-                  </p>
-                  <Button variant="outline" onClick={handleLogout} className="w-full">
-                    <LogOut className="h-4 w-4 mr-2" />
-                    Se déconnecter
-                  </Button>
+              <div className="space-y-2">
+                <Label htmlFor="username">Nom d'utilisateur</Label>
+                <div className="relative">
+                  <Users className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="username"
+                    type="text"
+                    value={loginUsername}
+                    onChange={(e) => setLoginUsername(e.target.value)}
+                    placeholder="zoe1"
+                    className="pl-10"
+                  />
                 </div>
-              ) : (
-                // Not logged in - show login form
-                <>
-                  <div className="space-y-2">
-                    <Label htmlFor="email">Email Admin</Label>
-                    <div className="relative">
-                      <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        id="email"
-                        type="email"
-                        value={loginEmail}
-                        onChange={(e) => setLoginEmail(e.target.value)}
-                        placeholder="zoe1@ayititalents.com"
-                        className="pl-10"
-                      />
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="password">Mot de passe</Label>
-                    <div className="relative">
-                      <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        id="password"
-                        type="password"
-                        value={loginPassword}
-                        onChange={(e) => setLoginPassword(e.target.value)}
-                        placeholder="••••••••"
-                        className="pl-10"
-                        onKeyPress={(e) => e.key === 'Enter' && handleAdminLogin()}
-                      />
-                    </div>
-                  </div>
-                  <Button 
-                    onClick={handleAdminLogin} 
-                    className="w-full"
-                    disabled={loginLoading}
-                  >
-                    {loginLoading ? (
-                      <>
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        Connexion...
-                      </>
-                    ) : (
-                      'Se connecter'
-                    )}
-                  </Button>
-                  
-                  <div className="mt-4 p-4 bg-muted/50 rounded-lg border border-border">
-                    <p className="text-sm text-muted-foreground text-center">
-                      <strong>🔐 Accès réservé aux administrateurs</strong><br/>
-                      <span className="text-xs">Contactez un admin si vous avez besoin d'accès.</span>
-                    </p>
-                  </div>
-                </>
-              )}
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="password">Mot de passe</Label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="password"
+                    type="password"
+                    value={loginPassword}
+                    onChange={(e) => setLoginPassword(e.target.value)}
+                    placeholder="••••••••"
+                    className="pl-10"
+                    onKeyPress={(e) => e.key === 'Enter' && handleAdminLogin()}
+                  />
+                </div>
+              </div>
+              <Button 
+                onClick={handleAdminLogin} 
+                className="w-full"
+                disabled={loginLoading}
+              >
+                {loginLoading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Connexion...
+                  </>
+                ) : (
+                  'Se connecter'
+                )}
+              </Button>
+              
+              <div className="mt-4 p-4 bg-muted/50 rounded-lg border border-border">
+                <p className="text-sm text-muted-foreground text-center">
+                  <strong>🔐 Accès réservé aux administrateurs</strong><br/>
+                  <span className="text-xs">Utilisateurs: zoe1, zoe2, zoe3</span>
+                </p>
+              </div>
             </CardContent>
           </Card>
         </div>
@@ -962,7 +931,7 @@ export const Admin: React.FC = () => {
             </h1>
           </div>
           <div className="flex items-center gap-4">
-            <span className="text-sm text-muted-foreground">{user.email}</span>
+            <span className="text-sm text-muted-foreground">Admin: {loginUsername}</span>
             <Button variant="outline" size="sm" onClick={handleLogout}>
               <LogOut className="h-4 w-4 mr-2" />
               Déconnexion
