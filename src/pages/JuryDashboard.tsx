@@ -8,17 +8,18 @@ import { Textarea } from '@/components/ui/textarea';
 import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 import { 
   Shield, LogOut, Star, Music, Mic, Award, 
   CheckCircle, Clock, User, Send, ChevronLeft, ChevronRight,
-  BarChart3, History, Bell, Trophy, TrendingUp, Sparkles
+  BarChart3, History, Bell, Trophy, TrendingUp, Sparkles, Loader2
 } from 'lucide-react';
 
-interface JurySession {
+interface JuryMemberInfo {
   id: string;
   name: string;
   email: string;
-  specialty: string;
+  specialty: string | null;
   photo_url: string | null;
 }
 
@@ -61,7 +62,9 @@ const CRITERIA = [
 export const JuryDashboard: React.FC = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const [jurySession, setJurySession] = useState<JurySession | null>(null);
+  const { user, loading: authLoading, signOut } = useAuth();
+  
+  const [juryMember, setJuryMember] = useState<JuryMemberInfo | null>(null);
   const [contestants, setContestants] = useState<Contestant[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [votedContestants, setVotedContestants] = useState<string[]>([]);
@@ -84,23 +87,52 @@ export const JuryDashboard: React.FC = () => {
   });
 
   useEffect(() => {
-    // Check jury session
-    const sessionData = localStorage.getItem('jury_session');
-    if (!sessionData) {
-      navigate('/jury-auth');
-      return;
-    }
-    
-    try {
-      const session = JSON.parse(sessionData);
-      setJurySession(session);
-      loadContestants(session.id);
-    } catch {
-      navigate('/jury-auth');
-    }
-  }, [navigate]);
+    const checkJuryAccess = async () => {
+      if (authLoading) return;
+      
+      if (!user) {
+        navigate('/jury-auth');
+        return;
+      }
 
-  const loadContestants = async (juryId: string) => {
+      try {
+        // Get jury member ID using the secure function
+        const { data: juryMemberId, error: idError } = await supabase.rpc('get_jury_member_id', {
+          _user_id: user.id
+        });
+
+        if (idError || !juryMemberId) {
+          toast({
+            title: "Accès refusé",
+            description: "Vous n'êtes pas autorisé à accéder à l'espace jury",
+            variant: "destructive"
+          });
+          await signOut();
+          navigate('/jury-auth');
+          return;
+        }
+
+        // Get jury member details (using admin-only policy, so we fetch from RPC or use auth data)
+        // Since we can't read jury_members directly, use a simpler approach
+        setJuryMember({
+          id: juryMemberId,
+          name: user.email?.split('@')[0] || 'Membre du Jury',
+          email: user.email || '',
+          specialty: null,
+          photo_url: null
+        });
+
+        loadContestants(juryMemberId);
+      } catch (error) {
+        console.error('Error checking jury access:', error);
+        navigate('/jury-auth');
+      }
+    };
+
+    checkJuryAccess();
+  }, [user, authLoading, navigate, toast, signOut]);
+
+  const loadContestants = async (juryMemberId: string) => {
     try {
       // Load active contestants
       const { data: contestantsData, error: contestantsError } = await supabase
@@ -114,8 +146,8 @@ export const JuryDashboard: React.FC = () => {
       // Load already voted contestants
       const { data: votesData, error: votesError } = await supabase
         .from('jury_votes')
-        .select('contestant_id')
-        .eq('jury_member_id', juryId);
+        .select('contestant_id, score, created_at')
+        .eq('jury_member_id', juryMemberId);
 
       if (votesError) throw votesError;
 
@@ -131,8 +163,8 @@ export const JuryDashboard: React.FC = () => {
             history.push({
               contestant_id: vote.contestant_id,
               contestant_name: contestant.name,
-              score: (vote as any).score || 0,
-              created_at: (vote as any).created_at || new Date().toISOString()
+              score: vote.score || 0,
+              created_at: vote.created_at || new Date().toISOString()
             });
           }
         }
@@ -154,8 +186,8 @@ export const JuryDashboard: React.FC = () => {
     }
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem('jury_session');
+  const handleLogout = async () => {
+    await signOut();
     toast({
       title: "Déconnexion",
       description: "Vous avez été déconnecté",
@@ -179,20 +211,21 @@ export const JuryDashboard: React.FC = () => {
   };
 
   const handleSubmitVote = async () => {
-    if (!jurySession || !contestants[currentIndex]) return;
+    if (!juryMember || !contestants[currentIndex]) return;
 
     setSubmitting(true);
     const contestant = contestants[currentIndex];
     const averageScore = calculateAverageScore();
 
     try {
+      // The trigger will automatically set the correct jury_member_id based on auth.uid()
       const { error } = await supabase
         .from('jury_votes')
         .upsert({
-          jury_member_id: jurySession.id,
+          jury_member_id: juryMember.id,
           contestant_id: contestant.id,
           score: averageScore,
-          comments: currentVote.comments,
+          comments: currentVote.comments.substring(0, 1000), // Enforce max length
           criteria_scores: currentVote.criteria_scores,
           updated_at: new Date().toISOString()
         }, {
@@ -216,11 +249,11 @@ export const JuryDashboard: React.FC = () => {
         setCurrentIndex(prev => prev + 1);
         resetVoteForm();
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error submitting vote:', err);
       toast({
         title: "Erreur",
-        description: "Impossible d'enregistrer le vote",
+        description: err.message || "Impossible d'enregistrer le vote",
         variant: "destructive"
       });
     } finally {
@@ -248,55 +281,65 @@ export const JuryDashboard: React.FC = () => {
     } else if (direction === 'next' && currentIndex < contestants.length - 1) {
       setCurrentIndex(prev => prev + 1);
     }
+    // Reset form when navigating
+    setCurrentVote(prev => ({
+      ...prev,
+      contestant_id: contestants[direction === 'prev' ? currentIndex - 1 : currentIndex + 1]?.id || '',
+      comments: '',
+      criteria_scores: {
+        technique: 5,
+        creativity: 5,
+        stage_presence: 5,
+        originality: 5,
+      }
+    }));
   };
 
-  if (loading) {
+  if (loading || authLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-primary/5 to-background">
         <div className="text-center">
-          <div className="animate-spin text-4xl mb-4">⏳</div>
-          <p className="text-muted-foreground">Chargement...</p>
+          <Loader2 className="h-12 w-12 animate-spin text-primary mx-auto mb-4" />
+          <p className="text-muted-foreground">Chargement du tableau de bord...</p>
         </div>
       </div>
     );
   }
 
   const currentContestant = contestants[currentIndex];
-  const hasVoted = currentContestant && votedContestants.includes(currentContestant.id);
-  const progress = (votedContestants.length / contestants.length) * 100;
+  const hasVoted = currentContestant ? votedContestants.includes(currentContestant.id) : false;
+  const progress = contestants.length > 0 ? (votedContestants.length / contestants.length) * 100 : 0;
 
   return (
-    <div className="min-h-screen py-8 px-4 pt-32 bg-gradient-to-br from-background via-primary/5 to-background">
+    <div className="min-h-screen py-6 px-4 pt-32 bg-gradient-to-br from-background via-primary/5 to-background">
       <div className="container mx-auto max-w-6xl">
         {/* Header */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
           <div className="flex items-center gap-4">
             <div className="w-16 h-16 bg-gradient-sunset rounded-full flex items-center justify-center shadow-lg">
-              {jurySession?.photo_url ? (
-                <img 
-                  src={jurySession.photo_url} 
-                  alt={jurySession.name}
-                  className="w-full h-full rounded-full object-cover"
-                />
-              ) : (
-                <Shield className="h-8 w-8 text-white" />
-              )}
+              <Shield className="h-8 w-8 text-white" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-foreground">{jurySession?.name}</h1>
-              <p className="text-muted-foreground">Membre du Jury • {jurySession?.specialty}</p>
+              <h1 className="text-2xl font-bold text-foreground">Tableau de Vote</h1>
+              <p className="text-muted-foreground">
+                {juryMember?.name} • {juryMember?.specialty || 'Membre du Jury'}
+              </p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <Button 
-              variant={showHistory ? "default" : "outline"} 
-              onClick={() => setShowHistory(!showHistory)} 
-              className="flex items-center gap-2"
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setShowHistory(!showHistory)}
+              className="gap-2"
             >
               <History className="h-4 w-4" />
               Historique
             </Button>
-            <Button variant="outline" onClick={handleLogout} className="flex items-center gap-2">
+            <Button
+              variant="destructive"
+              onClick={handleLogout}
+              className="gap-2"
+            >
               <LogOut className="h-4 w-4" />
               Déconnexion
             </Button>
@@ -304,113 +347,72 @@ export const JuryDashboard: React.FC = () => {
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-          <Card className="bg-gradient-to-br from-purple-500/20 to-purple-600/10 border-purple-500/30">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-purple-500/20 rounded-lg">
-                  <CheckCircle className="h-5 w-5 text-purple-400" />
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Votés</p>
-                  <p className="text-2xl font-bold text-purple-400">{votedContestants.length}</p>
-                </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+          <Card className="bg-gradient-to-br from-green-500/20 to-emerald-500/20 border-green-400/30">
+            <CardContent className="p-4 flex items-center gap-4">
+              <div className="p-3 bg-green-500/20 rounded-full">
+                <CheckCircle className="h-6 w-6 text-green-400" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-foreground">{votedContestants.length}</p>
+                <p className="text-sm text-muted-foreground">Candidats évalués</p>
               </div>
             </CardContent>
           </Card>
 
-          <Card className="bg-gradient-to-br from-blue-500/20 to-blue-600/10 border-blue-500/30">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-blue-500/20 rounded-lg">
-                  <Clock className="h-5 w-5 text-blue-400" />
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Restants</p>
-                  <p className="text-2xl font-bold text-blue-400">{contestants.length - votedContestants.length}</p>
-                </div>
+          <Card className="bg-gradient-to-br from-yellow-500/20 to-orange-500/20 border-yellow-400/30">
+            <CardContent className="p-4 flex items-center gap-4">
+              <div className="p-3 bg-yellow-500/20 rounded-full">
+                <Clock className="h-6 w-6 text-yellow-400" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-foreground">{contestants.length - votedContestants.length}</p>
+                <p className="text-sm text-muted-foreground">Restants</p>
               </div>
             </CardContent>
           </Card>
 
-          <Card className="bg-gradient-to-br from-green-500/20 to-green-600/10 border-green-500/30">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-green-500/20 rounded-lg">
-                  <TrendingUp className="h-5 w-5 text-green-400" />
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Progression</p>
-                  <p className="text-2xl font-bold text-green-400">{Math.round(progress)}%</p>
-                </div>
+          <Card className="bg-gradient-to-br from-purple-500/20 to-pink-500/20 border-purple-400/30">
+            <CardContent className="p-4 flex items-center gap-4">
+              <div className="p-3 bg-purple-500/20 rounded-full">
+                <TrendingUp className="h-6 w-6 text-purple-400" />
               </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-gradient-to-br from-yellow-500/20 to-yellow-600/10 border-yellow-500/30">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-yellow-500/20 rounded-lg">
-                  <Trophy className="h-5 w-5 text-yellow-400" />
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Poids Vote</p>
-                  <p className="text-2xl font-bold text-yellow-400">49%</p>
-                </div>
+              <div>
+                <p className="text-2xl font-bold text-foreground">{Math.round(progress)}%</p>
+                <p className="text-sm text-muted-foreground">Progression</p>
               </div>
             </CardContent>
           </Card>
         </div>
 
         {/* Progress Bar */}
-        <Card className="mb-6 bg-card/95 backdrop-blur-sm border-0 shadow-card">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-medium">Progression globale</span>
-              <Badge variant="secondary">{votedContestants.length} / {contestants.length} candidats</Badge>
-            </div>
-            <Progress value={progress} className="h-3" />
-          </CardContent>
-        </Card>
+        <div className="mb-8">
+          <Progress value={progress} className="h-3" />
+          <p className="text-sm text-muted-foreground mt-2 text-center">
+            {votedContestants.length} sur {contestants.length} candidats évalués
+          </p>
+        </div>
 
         {/* Vote History Panel */}
         {showHistory && (
-          <Card className="mb-6 bg-card/95 backdrop-blur-sm border-0 shadow-card">
+          <Card className="mb-8 bg-card/80 backdrop-blur-sm">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <History className="h-5 w-5 text-primary" />
-                Historique de vos votes
+                <History className="h-5 w-5" />
+                Historique des votes
               </CardTitle>
-              <CardDescription>
-                Tous les votes que vous avez soumis
-              </CardDescription>
             </CardHeader>
             <CardContent>
               {voteHistory.length === 0 ? (
-                <p className="text-center text-muted-foreground py-4">
-                  Vous n'avez pas encore voté pour un candidat.
-                </p>
+                <p className="text-muted-foreground text-center py-4">Aucun vote enregistré</p>
               ) : (
-                <div className="space-y-3">
-                  {voteHistory.map((vote, index) => (
-                    <div 
-                      key={vote.contestant_id} 
-                      className="flex items-center justify-between p-3 bg-muted/50 rounded-lg"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-sm font-bold">
-                          {index + 1}
-                        </div>
-                        <div>
-                          <p className="font-medium">{vote.contestant_name}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {new Date(vote.created_at).toLocaleDateString('fr-FR')}
-                          </p>
-                        </div>
+                <div className="space-y-2 max-h-60 overflow-y-auto">
+                  {voteHistory.map((vote) => (
+                    <div key={vote.contestant_id} className="flex justify-between items-center p-3 bg-muted/50 rounded-lg">
+                      <span className="font-medium">{vote.contestant_name}</span>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="secondary">{vote.score}/10</Badge>
                       </div>
-                      <Badge className="text-lg px-3 bg-primary">
-                        {vote.score}/10
-                      </Badge>
                     </div>
                   ))}
                 </div>
@@ -419,200 +421,205 @@ export const JuryDashboard: React.FC = () => {
           </Card>
         )}
 
+        {/* Main Content */}
         {contestants.length === 0 ? (
-          <Card className="bg-card/95 backdrop-blur-sm border-0 shadow-card">
+          <Card className="bg-card/80 backdrop-blur-sm">
             <CardContent className="p-12 text-center">
               <User className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
               <h3 className="text-xl font-semibold mb-2">Aucun candidat</h3>
-              <p className="text-muted-foreground">
-                Il n'y a pas encore de candidats actifs à noter.
-              </p>
+              <p className="text-muted-foreground">Il n'y a pas encore de candidats à évaluer.</p>
             </CardContent>
           </Card>
         ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Contestant Info */}
-            <Card className="lg:col-span-1 bg-card/95 backdrop-blur-sm border-0 shadow-card">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            {/* Contestant Card */}
+            <Card className="bg-card/80 backdrop-blur-sm">
               <CardHeader>
-                <div className="flex items-center justify-between">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => navigateContestant('prev')}
-                    disabled={currentIndex === 0}
-                  >
-                    <ChevronLeft className="h-4 w-4" />
-                  </Button>
-                  <span className="text-sm text-muted-foreground">
-                    {currentIndex + 1} / {contestants.length}
-                  </span>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => navigateContestant('next')}
-                    disabled={currentIndex === contestants.length - 1}
-                  >
-                    <ChevronRight className="h-4 w-4" />
-                  </Button>
+                <div className="flex justify-between items-center">
+                  <CardTitle className="flex items-center gap-2">
+                    <User className="h-5 w-5" />
+                    Candidat {currentIndex + 1}/{contestants.length}
+                  </CardTitle>
+                  {hasVoted && (
+                    <Badge className="bg-green-500/20 text-green-400 border-green-400/30">
+                      <CheckCircle className="h-3 w-3 mr-1" />
+                      Évalué
+                    </Badge>
+                  )}
                 </div>
               </CardHeader>
-              <CardContent className="text-center">
-                <div className="relative inline-block mb-4">
+              <CardContent>
+                <div className="text-center mb-6">
                   {currentContestant?.photo_url ? (
                     <img
                       src={currentContestant.photo_url}
                       alt={currentContestant.name}
-                      className="w-32 h-32 rounded-full object-cover mx-auto border-4 border-primary/20"
+                      className="w-32 h-32 rounded-full mx-auto object-cover border-4 border-primary/30 shadow-lg"
                     />
                   ) : (
-                    <div className="w-32 h-32 rounded-full bg-muted flex items-center justify-center mx-auto">
-                      <User className="h-16 w-16 text-muted-foreground" />
+                    <div className="w-32 h-32 rounded-full mx-auto bg-gradient-sunset flex items-center justify-center shadow-lg">
+                      <User className="h-16 w-16 text-white" />
                     </div>
                   )}
-                  {hasVoted && (
-                    <div className="absolute -top-2 -right-2 bg-accent text-white rounded-full p-2">
-                      <CheckCircle className="h-4 w-4" />
-                    </div>
-                  )}
-                </div>
-
-                <h3 className="text-xl font-bold mb-2">{currentContestant?.name}</h3>
-                
-                <div className="flex flex-wrap justify-center gap-2 mb-4">
+                  <h2 className="text-2xl font-bold mt-4">{currentContestant?.name}</h2>
                   {currentContestant?.category && (
-                    <Badge variant="secondary">{currentContestant.category}</Badge>
+                    <Badge variant="secondary" className="mt-2">{currentContestant.category}</Badge>
                   )}
                   {currentContestant?.location && (
-                    <Badge variant="outline">{currentContestant.location}</Badge>
+                    <p className="text-muted-foreground text-sm mt-1">{currentContestant.location}</p>
                   )}
                 </div>
 
                 {currentContestant?.talents && currentContestant.talents.length > 0 && (
-                  <div className="flex flex-wrap justify-center gap-1 mb-4">
-                    {currentContestant.talents.map((talent, i) => (
-                      <Badge key={i} className="bg-primary/10 text-primary text-xs">
-                        {talent}
-                      </Badge>
-                    ))}
+                  <div className="mb-4">
+                    <p className="text-sm font-medium mb-2">Talents:</p>
+                    <div className="flex flex-wrap gap-2">
+                      {currentContestant.talents.map((talent, idx) => (
+                        <Badge key={idx} variant="outline">{talent}</Badge>
+                      ))}
+                    </div>
                   </div>
                 )}
 
                 {currentContestant?.bio && (
-                  <p className="text-sm text-muted-foreground">
-                    {currentContestant.bio}
-                  </p>
+                  <div className="p-4 bg-muted/50 rounded-lg">
+                    <p className="text-sm">{currentContestant.bio}</p>
+                  </div>
                 )}
+
+                {/* Navigation */}
+                <div className="flex justify-between mt-6">
+                  <Button
+                    variant="outline"
+                    onClick={() => navigateContestant('prev')}
+                    disabled={currentIndex === 0}
+                    className="gap-2"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                    Précédent
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => navigateContestant('next')}
+                    disabled={currentIndex === contestants.length - 1}
+                    className="gap-2"
+                  >
+                    Suivant
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
               </CardContent>
             </Card>
 
-            {/* Voting Form */}
-            <Card className="lg:col-span-2 bg-card/95 backdrop-blur-sm border-0 shadow-card">
+            {/* Voting Card */}
+            <Card className="bg-card/80 backdrop-blur-sm">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <Star className="h-5 w-5 text-highlight" />
+                  <Star className="h-5 w-5 text-yellow-400" />
                   Évaluation
                 </CardTitle>
                 <CardDescription>
-                  Notez le candidat sur chaque critère (1-10)
+                  Notez chaque critère de 1 à 10
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
-                {/* Criteria Sliders */}
-                {CRITERIA.map(({ key, label, icon: Icon, description }) => (
-                  <div key={key} className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <Icon className="h-4 w-4 text-primary" />
-                        <span className="font-medium">{label}</span>
+                {CRITERIA.map((criterion) => {
+                  const Icon = criterion.icon;
+                  const value = currentVote.criteria_scores[criterion.key as keyof typeof currentVote.criteria_scores];
+                  
+                  return (
+                    <div key={criterion.key} className="space-y-2">
+                      <div className="flex justify-between items-center">
+                        <div className="flex items-center gap-2">
+                          <Icon className="h-4 w-4 text-primary" />
+                          <span className="font-medium">{criterion.label}</span>
+                        </div>
+                        <Badge variant="secondary" className="text-lg px-3">
+                          {value}/10
+                        </Badge>
                       </div>
-                      <Badge variant="secondary" className="text-lg px-3">
-                        {currentVote.criteria_scores[key as keyof typeof currentVote.criteria_scores]}
-                      </Badge>
+                      <Slider
+                        value={[value]}
+                        onValueChange={(val) => handleCriteriaChange(criterion.key, val)}
+                        min={1}
+                        max={10}
+                        step={1}
+                        className="cursor-pointer"
+                      />
+                      <p className="text-xs text-muted-foreground">{criterion.description}</p>
                     </div>
-                    <p className="text-xs text-muted-foreground">{description}</p>
-                    <Slider
-                      value={[currentVote.criteria_scores[key as keyof typeof currentVote.criteria_scores]]}
-                      onValueChange={(value) => handleCriteriaChange(key, value)}
-                      min={1}
-                      max={10}
-                      step={1}
-                      className="w-full"
-                    />
-                  </div>
-                ))}
+                  );
+                })}
 
                 {/* Average Score Display */}
-                <div className="p-4 bg-gradient-sunset/10 rounded-xl text-center">
-                  <p className="text-sm text-muted-foreground mb-1">Note Moyenne</p>
-                  <p className="text-4xl font-bold text-primary">{calculateAverageScore()}</p>
-                  <p className="text-sm text-muted-foreground">/ 10</p>
+                <div className="p-4 bg-gradient-to-r from-primary/20 to-secondary/20 rounded-lg text-center">
+                  <p className="text-sm text-muted-foreground mb-1">Score Moyen</p>
+                  <p className="text-4xl font-bold text-primary">{calculateAverageScore()}/10</p>
                 </div>
 
                 {/* Comments */}
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Commentaires (optionnel)</label>
                   <Textarea
-                    placeholder="Vos remarques sur la performance..."
                     value={currentVote.comments}
                     onChange={(e) => setCurrentVote(prev => ({ ...prev, comments: e.target.value }))}
+                    placeholder="Vos observations sur la performance..."
+                    className="resize-none"
                     rows={3}
+                    maxLength={1000}
                   />
+                  <p className="text-xs text-muted-foreground text-right">
+                    {currentVote.comments.length}/1000 caractères
+                  </p>
                 </div>
 
                 {/* Submit Button */}
                 <Button
                   onClick={handleSubmitVote}
-                  disabled={submitting}
-                  className="w-full bg-gradient-sunset hover:opacity-90 text-white font-semibold h-12"
+                  disabled={submitting || !currentContestant}
+                  className="w-full bg-gradient-sunset hover:opacity-90 text-white font-semibold h-12 text-lg gap-2"
                 >
                   {submitting ? (
-                    <span className="flex items-center gap-2">
-                      <span className="animate-spin">⏳</span>
+                    <>
+                      <Loader2 className="h-5 w-5 animate-spin" />
                       Envoi...
-                    </span>
+                    </>
+                  ) : hasVoted ? (
+                    <>
+                      <CheckCircle className="h-5 w-5" />
+                      Mettre à jour le vote
+                    </>
                   ) : (
-                    <span className="flex items-center gap-2">
-                      <Send className="h-4 w-4" />
-                      {hasVoted ? 'Modifier ma note' : 'Soumettre ma note'}
-                    </span>
+                    <>
+                      <Send className="h-5 w-5" />
+                      Soumettre le vote
+                    </>
                   )}
                 </Button>
-
-                {hasVoted && (
-                  <p className="text-center text-sm text-accent">
-                    ✅ Vous avez déjà noté ce candidat
-                  </p>
-                )}
               </CardContent>
             </Card>
           </div>
         )}
 
         {/* Legend */}
-        <Card className="mt-6 bg-primary/10 border-primary/20">
-          <CardContent className="p-4">
-            <h4 className="font-bold text-xl text-white mb-4">📊 Pondération des Votes</h4>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="flex items-center gap-3 p-3 bg-purple-500/20 rounded-lg border border-purple-400">
-                <Shield className="h-6 w-6 text-purple-400" />
-                <div>
-                  <p className="font-bold text-white text-lg">Jury: 49%</p>
-                  <p className="text-purple-200 text-sm">Performance</p>
-                </div>
+        <Card className="mt-8 bg-gradient-to-r from-blue-500/10 to-purple-500/10 border-blue-400/30">
+          <CardContent className="p-6">
+            <h4 className="font-bold mb-4 flex items-center gap-2">
+              <BarChart3 className="h-5 w-5" />
+              Pondération des votes
+            </h4>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full bg-purple-500"></div>
+                <span>Jury (Performance): <strong>49%</strong></span>
               </div>
-              <div className="flex items-center gap-3 p-3 bg-green-500/20 rounded-lg border border-green-400">
-                <Award className="h-6 w-6 text-green-400" />
-                <div>
-                  <p className="font-bold text-white text-lg">Payants: 49%</p>
-                  <p className="text-green-200 text-sm">150 HTG/vote</p>
-                </div>
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                <span>Votes Payants: <strong>49%</strong></span>
               </div>
-              <div className="flex items-center gap-3 p-3 bg-blue-500/20 rounded-lg border border-blue-400">
-                <User className="h-6 w-6 text-blue-400" />
-                <div>
-                  <p className="font-bold text-white text-lg">Gratuits: 2%</p>
-                  <p className="text-blue-200 text-sm">1 vote/jour</p>
-                </div>
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
+                <span>Votes Gratuits: <strong>2%</strong></span>
               </div>
             </div>
           </CardContent>
@@ -621,4 +628,3 @@ export const JuryDashboard: React.FC = () => {
     </div>
   );
 };
-

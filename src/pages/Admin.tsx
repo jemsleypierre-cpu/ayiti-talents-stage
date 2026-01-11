@@ -8,6 +8,8 @@ import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { Link, useNavigate } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
+import { useAdminAuth } from '@/hooks/useAdminAuth';
 import { 
   Users, 
   CheckCircle, 
@@ -36,14 +38,11 @@ import {
   TrendingUp,
   ArrowLeft,
   Lock,
-  Loader2
+  Loader2,
+  Mail
 } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import { ExportButton } from '@/components/ExportButton';
-
-// Liste des administrateurs autorisés (usernames simples)
-const ADMIN_USERS = ['zoe1', 'zoe2', 'zoe3'];
-const ADMIN_PASSWORD = 'Zoe2106';
 
 interface CandidateApplication {
   id: string;
@@ -98,10 +97,11 @@ interface JuryMember {
 export const Admin: React.FC = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
+  const { user, signOut } = useAuth();
+  const { isAdmin, loading: adminLoading } = useAdminAuth();
   
-  // Simple auth state
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [loginUsername, setLoginUsername] = useState('');
+  // Auth state
+  const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
   const [loginLoading, setLoginLoading] = useState(false);
   
@@ -157,12 +157,12 @@ export const Admin: React.FC = () => {
   const [editingJury, setEditingJury] = useState<string | null>(null);
   const [savingJury, setSavingJury] = useState(false);
 
-  // Simple username/password login
-  const handleAdminLogin = () => {
-    if (!loginUsername || !loginPassword) {
+  // Supabase Auth login
+  const handleAdminLogin = async () => {
+    if (!loginEmail || !loginPassword) {
       toast({
         title: "Erreur",
-        description: "Veuillez entrer votre nom d'utilisateur et mot de passe.",
+        description: "Veuillez entrer votre email et mot de passe.",
         variant: "destructive"
       });
       return;
@@ -170,31 +170,65 @@ export const Admin: React.FC = () => {
 
     setLoginLoading(true);
     
-    // Check credentials
-    const isValidUser = ADMIN_USERS.includes(loginUsername.toLowerCase());
-    const isValidPassword = loginPassword === ADMIN_PASSWORD;
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: loginEmail.trim().toLowerCase(),
+        password: loginPassword
+      });
 
-    setTimeout(() => {
-      if (isValidUser && isValidPassword) {
-        setIsAuthenticated(true);
-        toast({
-          title: "Connexion réussie",
-          description: `Bienvenue ${loginUsername}!`,
-        });
-      } else {
+      if (error) {
         toast({
           title: "Erreur de connexion",
-          description: "Nom d'utilisateur ou mot de passe incorrect.",
+          description: error.message === 'Invalid login credentials' 
+            ? "Email ou mot de passe incorrect." 
+            : error.message,
           variant: "destructive"
         });
+        setLoginLoading(false);
+        return;
       }
+
+      if (!data.user) {
+        toast({
+          title: "Erreur",
+          description: "Échec de l'authentification",
+          variant: "destructive"
+        });
+        setLoginLoading(false);
+        return;
+      }
+
+      // Check admin role - the useAdminAuth hook will handle this
+      toast({
+        title: "Connexion réussie",
+        description: "Vérification des droits d'accès...",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Erreur",
+        description: error.message || "Une erreur s'est produite",
+        variant: "destructive"
+      });
+    } finally {
       setLoginLoading(false);
-    }, 500);
+    }
   };
 
-  const handleLogout = () => {
-    setIsAuthenticated(false);
-    setLoginUsername('');
+  // Check if user is admin after login
+  useEffect(() => {
+    if (user && !adminLoading && !isAdmin) {
+      toast({
+        title: "Accès refusé",
+        description: "Vous n'avez pas les droits d'administrateur.",
+        variant: "destructive"
+      });
+      signOut();
+    }
+  }, [user, isAdmin, adminLoading, signOut, toast]);
+
+  const handleLogout = async () => {
+    await signOut();
+    setLoginEmail('');
     setLoginPassword('');
     navigate('/');
   };
@@ -800,14 +834,14 @@ export const Admin: React.FC = () => {
 
   // Charger les données quand l'admin est authentifié
   useEffect(() => {
-    if (isAuthenticated) {
+    if (isAdmin) {
       loadApplications();
       loadContents();
       loadSponsors();
       loadSettings();
       loadJuryMembers();
     }
-  }, [isAuthenticated]);
+  }, [isAdmin]);
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -830,8 +864,20 @@ export const Admin: React.FC = () => {
     return labels[category] || category;
   };
 
-  // Page de connexion admin - si pas connecté
-  if (!isAuthenticated) {
+  // Loading state
+  if (adminLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-card/50 to-background">
+        <div className="text-center">
+          <Loader2 className="h-12 w-12 animate-spin text-primary mx-auto mb-4" />
+          <p className="text-muted-foreground">Vérification des droits d'accès...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Page de connexion admin - si pas connecté ou pas admin
+  if (!user || !isAdmin) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-background via-card/50 to-background flex items-center justify-center p-4">
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/20 via-transparent to-transparent"></div>
@@ -860,15 +906,15 @@ export const Admin: React.FC = () => {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="username">Nom d'utilisateur</Label>
+                <Label htmlFor="email">Email</Label>
                 <div className="relative">
-                  <Users className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
-                    id="username"
-                    type="text"
-                    value={loginUsername}
-                    onChange={(e) => setLoginUsername(e.target.value)}
-                    placeholder="zoe1"
+                    id="email"
+                    type="email"
+                    value={loginEmail}
+                    onChange={(e) => setLoginEmail(e.target.value)}
+                    placeholder="admin@ayititalents.com"
                     className="pl-10"
                   />
                 </div>
@@ -906,7 +952,7 @@ export const Admin: React.FC = () => {
               <div className="mt-4 p-4 bg-muted/50 rounded-lg border border-border">
                 <p className="text-sm text-muted-foreground text-center">
                   <strong>🔐 Accès réservé aux administrateurs</strong><br/>
-                  <span className="text-xs">Utilisateurs: zoe1, zoe2, zoe3</span>
+                  <span className="text-xs">Contactez l'équipe pour obtenir un accès.</span>
                 </p>
               </div>
             </CardContent>
@@ -931,7 +977,7 @@ export const Admin: React.FC = () => {
             </h1>
           </div>
           <div className="flex items-center gap-4">
-            <span className="text-sm text-muted-foreground">Admin: {loginUsername}</span>
+            <span className="text-sm text-muted-foreground">Admin: {user?.email}</span>
             <Button variant="outline" size="sm" onClick={handleLogout}>
               <LogOut className="h-4 w-4 mr-2" />
               Déconnexion

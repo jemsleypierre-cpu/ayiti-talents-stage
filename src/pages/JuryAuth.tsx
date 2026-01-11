@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -6,59 +6,108 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { Shield, Lock, Mail, Eye, EyeOff } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
+import { Shield, Lock, Mail, Eye, EyeOff, Loader2 } from 'lucide-react';
 
 export const JuryAuth: React.FC = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { user, loading: authLoading } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  // Membres du jury (authentification locale)
-  const JURY_MEMBERS = [
-    { id: '1', name: 'Jean-Marc Désinor', email: 'jury1@ayititalents.com', password: '@jury123', specialty: 'Musique' },
-    { id: '2', name: 'Marie-Flore Saint-Jean', email: 'jury2@ayititalents.com', password: '@jury123', specialty: 'Danse' },
-    { id: '3', name: 'Patrick Sylvain', email: 'jury3@ayititalents.com', password: '@jury123', specialty: 'Chant' },
-  ];
+  // Check if already logged in as jury member
+  useEffect(() => {
+    const checkJuryStatus = async () => {
+      if (user) {
+        const { data: isJury } = await supabase.rpc('is_jury_member', { _user_id: user.id });
+        if (isJury) {
+          navigate('/jury-dashboard');
+        }
+      }
+    };
+    
+    if (!authLoading) {
+      checkJuryStatus();
+    }
+  }, [user, authLoading, navigate]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
-    // Vérifier les credentials localement
-    const juryMember = JURY_MEMBERS.find(
-      member => member.email.toLowerCase() === email.toLowerCase() && member.password === password
-    );
+    try {
+      // Authenticate with Supabase Auth
+      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+        email: email.trim().toLowerCase(),
+        password
+      });
 
-    if (!juryMember) {
+      if (authError) {
+        toast({
+          title: "Erreur de connexion",
+          description: authError.message === 'Invalid login credentials' 
+            ? "Email ou mot de passe incorrect" 
+            : authError.message,
+          variant: "destructive"
+        });
+        setLoading(false);
+        return;
+      }
+
+      if (!authData.user) {
+        toast({
+          title: "Erreur",
+          description: "Échec de l'authentification",
+          variant: "destructive"
+        });
+        setLoading(false);
+        return;
+      }
+
+      // Check if user is a jury member
+      const { data: isJury, error: juryError } = await supabase.rpc('is_jury_member', { 
+        _user_id: authData.user.id 
+      });
+
+      if (juryError || !isJury) {
+        await supabase.auth.signOut();
+        toast({
+          title: "Accès refusé",
+          description: "Ce compte n'est pas autorisé à accéder à l'espace jury",
+          variant: "destructive"
+        });
+        setLoading(false);
+        return;
+      }
+
       toast({
-        title: "Erreur de connexion",
-        description: "Email ou mot de passe incorrect",
+        title: "Bienvenue!",
+        description: "Connexion réussie",
+      });
+
+      navigate('/jury-dashboard');
+    } catch (error) {
+      console.error('Login error:', error);
+      toast({
+        title: "Erreur",
+        description: "Une erreur s'est produite lors de la connexion",
         variant: "destructive"
       });
+    } finally {
       setLoading(false);
-      return;
     }
-
-    // Stocker les infos du jury dans localStorage
-    localStorage.setItem('jury_session', JSON.stringify({
-      id: juryMember.id,
-      name: juryMember.name,
-      email: juryMember.email,
-      specialty: juryMember.specialty,
-      loggedInAt: new Date().toISOString()
-    }));
-
-    toast({
-      title: "Bienvenue!",
-      description: `Connecté en tant que ${juryMember.name}`,
-    });
-
-    setLoading(false);
-    navigate('/jury-dashboard');
   };
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen py-12 px-4 pt-48 bg-gradient-to-br from-background via-primary/5 to-background">
@@ -135,7 +184,7 @@ export const JuryAuth: React.FC = () => {
               >
                 {loading ? (
                   <span className="flex items-center gap-2">
-                    <span className="animate-spin">⏳</span>
+                    <Loader2 className="h-4 w-4 animate-spin" />
                     Connexion...
                   </span>
                 ) : (
@@ -198,4 +247,3 @@ export const JuryAuth: React.FC = () => {
     </div>
   );
 };
-

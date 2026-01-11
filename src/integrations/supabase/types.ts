@@ -151,6 +151,7 @@ export type Database = {
           photo_url: string | null
           specialty: string | null
           updated_at: string | null
+          user_id: string | null
         }
         Insert: {
           active?: boolean | null
@@ -163,6 +164,7 @@ export type Database = {
           photo_url?: string | null
           specialty?: string | null
           updated_at?: string | null
+          user_id?: string | null
         }
         Update: {
           active?: boolean | null
@@ -175,6 +177,7 @@ export type Database = {
           photo_url?: string | null
           specialty?: string | null
           updated_at?: string | null
+          user_id?: string | null
         }
         Relationships: []
       }
@@ -476,6 +479,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_jury_member_id: { Args: { _user_id: string }; Returns: string }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -483,6 +487,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_jury_member: { Args: { _user_id: string }; Returns: boolean }
     }
     Enums: {
       app_role: "admin" | "moderator" | "user" | "jury"
