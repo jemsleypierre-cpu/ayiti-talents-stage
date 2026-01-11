@@ -224,6 +224,13 @@ export type Database = {
             referencedRelation: "jury_members"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "jury_votes_jury_member_id_fkey"
+            columns: ["jury_member_id"]
+            isOneToOne: false
+            referencedRelation: "jury_members_public"
+            referencedColumns: ["id"]
+          },
         ]
       }
       news: {
@@ -473,7 +480,33 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      jury_members_public: {
+        Row: {
+          active: boolean | null
+          bio: string | null
+          id: string | null
+          name: string | null
+          photo_url: string | null
+          specialty: string | null
+        }
+        Insert: {
+          active?: boolean | null
+          bio?: string | null
+          id?: string | null
+          name?: string | null
+          photo_url?: string | null
+          specialty?: string | null
+        }
+        Update: {
+          active?: boolean | null
+          bio?: string | null
+          id?: string | null
+          name?: string | null
+          photo_url?: string | null
+          specialty?: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       has_role: {
